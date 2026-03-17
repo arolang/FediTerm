@@ -1,0 +1,6 @@
+ {{ <style: heading> }}FediTerm{{ <style: reset> }}{{ <style: muted> }}  ↑↓ navigate · n compose · r reply · esc quit{{ <style: reset> }}
+{{ <style: muted> }}{{ <style: separatorLine> }}{{ <style: reset> }}
+{{ for each <slot> in <display-slots> { }}{{ <style: cursorIndicator> }}{{ <slot: marker> }}{{ <style: reset> }} {{ <style: username> }}@{{ <slot: acct> }}{{ <style: reset> }}  {{ <style: authorName> }}{{ <slot: name> }}{{ <style: reset> }}  {{ <style: muted> }}{{ <slot: date> }}{{ <style: reset> }}{{ <slot: booster> }}
+  {{ <slot: content> }}
+{{ <style: muted> }}  {{ <slot: sep> }}{{ <style: reset> }}
+{{ } }}{{ <style: muted> }} {{ <total-posts> }} posts · pos {{ <selection> }}{{ <auto-label> }}{{ <style: reset> }}

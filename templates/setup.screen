@@ -1,0 +1,7 @@
+{{ Compute the <visible-text: clip> from <compose-text> with <style: inputWidth>. }} {{ <style: heading> }}FediTerm{{ <style: reset> }}{{ <style: muted> }}  First Run Setup{{ <style: reset> }}
+{{ <style: muted> }}{{ <style: separatorLine> }}{{ <style: reset> }}
+ {{ <style: prompt> }}{{ <setup-prompt> }}{{ <style: reset> }}
+{{ <style: muted> }}{{ <style: separatorLine> }}{{ <style: reset> }}
+  {{ <visible-text> }}{{ <style: cursor> }}▌{{ <style: reset> }}
+{{ <style: muted> }}{{ <style: separatorLine> }}{{ <style: reset> }}
+{{ <style: muted> }} enter confirm · esc quit{{ <style: reset> }}

@@ -1,0 +1,332 @@
+(* ============================================================
+   handlers.aro – Keyboard event handling
+
+   Fan-out pattern:
+     KeyPress Handler → emits single KeyDispatched event with key + mode
+     KeyDispatched Handler where <event: mode> == "timeline" – ↑↓ scroll | n compose | esc quit
+     KeyDispatched Handler where <event: mode> == "compose"  – chars type | backspace | esc cancel | enter send
+     KeyDispatched Handler where <event: mode> == "setup"    – chars type | backspace | esc quit | enter confirm
+
+   Variable naming: avoid is-* (is = keyword) and *-at (at = preposition)
+   ============================================================ *)
+
+(* ---- Dispatch: extract key + mode, emit single KeyDispatched event ---- *)
+
+(Dispatch Key: KeyPress Handler) {
+    Extract the <pressed-key> from the <event: key>.
+    Retrieve the <state>      from the <ui-state-repository> where <key> is "main".
+    Extract the <mode>        from the <state: mode>.
+    Compute the <panel-height>  from (<terminal: rows>) - 3.
+    Compute the <visible-count> from <panel-height> / 3.
+    Emit a <KeyDispatched: event> with { key: <pressed-key>, mode: <mode>, visibleCount: <visible-count> }.
+    Return an <OK: status> for the <key-dispatched>.
+}
+
+(* ════════════════════════════════════════
+   TIMELINE MODE
+   ════════════════════════════════════════ *)
+
+(Handle Timeline Key: KeyDispatched Handler) where <event: mode> == "timeline" {
+    Extract the <pressed-key>   from the <event: key>.
+    Extract the <visible-count> from the <event: visibleCount>.
+    Retrieve the <state>        from the <ui-state-repository> where <key> is "main".
+
+    match <pressed-key> {
+        case "escape" {
+            Stop the <keyboard> with <application>.
+        }
+        case "up" {
+            (* Move cursor up within window first; scroll only when cursor reaches top *)
+            Compute the <cursor-can-move-up> from (<state: cursor>) > 0.
+            match <cursor-can-move-up> {
+                case true {
+                    Compute the <cursor-moved-up> from (<state: cursor>) - 1.
+                    Update the <state: cursor>    with <cursor-moved-up>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+                case false {
+                    Compute the <scroll-moved-up> from (<state: selection>) - 1.
+                    Compute the <scroll-up-valid> from <scroll-moved-up> >= 0.
+                    match <scroll-up-valid> {
+                        case true  { Create the <new-scroll-position> with <scroll-moved-up>. }
+                        case false { Create the <new-scroll-position> with 0. }
+                    }
+                    Update the <state: selection> with <new-scroll-position>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+            }
+        }
+        case "down" {
+            (* Move cursor down within window first; scroll only when cursor reaches bottom *)
+            Compute the <cursor-moved-down>           from (<state: cursor>) + 1.
+            Compute the <last-visible-slot>           from <visible-count> / 2.
+            Compute the <next-post-absolute-index>    from (<state: selection>) + <cursor-moved-down>.
+            Compute the <cursor-within-visible-window> from <cursor-moved-down> <= <last-visible-slot>.
+            Compute the <post-exists-ahead>           from <next-post-absolute-index> < (<state: totalPosts>).
+            Compute the <can-advance-cursor>          from <cursor-within-visible-window> AND <post-exists-ahead>.
+            match <can-advance-cursor> {
+                case true {
+                    Update the <state: cursor>    with <cursor-moved-down>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+                case false {
+                    Compute the <maximum-scroll-position> from (<state: totalPosts>) - <visible-count>.
+                    Compute the <max-scroll-valid>        from <maximum-scroll-position> >= 0.
+                    match <max-scroll-valid> {
+                        case true  { Create the <scroll-position-cap> with <maximum-scroll-position>. }
+                        case false { Create the <scroll-position-cap> with 0. }
+                    }
+                    Compute the <scroll-moved-down> from (<state: selection>) + 1.
+                    Compute the <scroll-down-valid> from <scroll-moved-down> <= <scroll-position-cap>.
+                    match <scroll-down-valid> {
+                        case true  { Create the <new-scroll-position> with <scroll-moved-down>. }
+                        case false { Create the <new-scroll-position> with <scroll-position-cap>. }
+                    }
+                    Update the <state: selection> with <new-scroll-position>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+            }
+        }
+        case "n" {
+            Update the <state: mode>        with "compose".
+            Update the <state: composeText>  with "".
+            Store the <state> into the <ui-state-repository>.
+        }
+        case "r" {
+            Compute the <selected-index> from (<state: selection>) + (<state: cursor>).
+            Retrieve the <selected-post> from the <post-repository>
+                where <key> = <selected-index>
+                default { key: -1, mastodonId: "", acct: "", displayName: "", content: "", createdAt: "", boosterAcct: "" }.
+            Extract the <reply-target-id>   from the <selected-post: mastodonId>.
+            Extract the <reply-target-acct> from the <selected-post: acct>.
+            Compute the <no-post> from <reply-target-id> == "".
+            match <no-post> {
+                case true  { }
+                case false {
+                    Update the <state: mode>        with "reply".
+                    Update the <state: composeText>  with "".
+                    Update the <state: replyToId>   with <reply-target-id>.
+                    Update the <state: replyToAcct> with <reply-target-acct>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+            }
+        }
+    }
+
+    Return an <OK: status> for the <key-handled>.
+}
+
+(* ════════════════════════════════════════
+   COMPOSE MODE
+   ════════════════════════════════════════ *)
+
+(Handle Compose Key: KeyDispatched Handler) where <event: mode> == "compose" {
+    Extract the <pressed-key> from the <event: key>.
+
+    Retrieve the <cfg>         from the <config-repository> where <key> is "cfg".
+    Extract the <instance-url> from the <cfg: instance_url>.
+    Extract the <auth-header>  from the <cfg: auth_header>.
+
+    Retrieve the <state> from the <ui-state-repository> where <key> is "main".
+
+    match <pressed-key> {
+        case "escape" {
+            Update the <state: mode>        with "timeline".
+            Update the <state: composeText>  with "".
+            Store the <state> into the <ui-state-repository>.
+        }
+        case "enter" {
+            Compute the <statuses-url> from <instance-url> ++ "/api/v1/statuses".
+            Request the <post-result> to <statuses-url> with {
+                headers: { Authorization: <auth-header> },
+                body: { status: <state: composeText>, visibility: "public" }
+            }.
+            Update the <state: mode>        with "timeline".
+            Update the <state: composeText>  with "".
+            Store the <state> into the <ui-state-repository>.
+        }
+        case "backspace" {
+            Compute the <txt-len: length> from (<state: composeText>).
+            Compute the <has-chars>        from <txt-len> > 0.
+            match <has-chars> {
+                case true {
+                    Compute the <new-len>       from <txt-len> - 1.
+                    Compute the <trimmed: clip> from (<state: composeText>) with <new-len>.
+                    Update the <state: composeText> with <trimmed>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+                case false { }
+            }
+        }
+    }
+
+    (* Append printable character — runs only when no control key matched *)
+    Create the <control-keys> with ["escape", "enter", "backspace", "up", "down", "left", "right", "tab"].
+    Compute the <control-key> from <control-keys> contains <pressed-key>.
+    match <control-key> {
+        case false {
+            Compute the <char-len: length> from (<state: composeText>).
+            Compute the <under-limit>       from <char-len> < 500.
+            match <under-limit> {
+                case true {
+                    Compute the <new-text> from (<state: composeText>) ++ <pressed-key>.
+                    Update the <state: composeText> with <new-text>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+                case false { }
+            }
+        }
+        case true { }
+    }
+
+    Return an <OK: status> for the <key-handled>.
+}
+
+(* ════════════════════════════════════════
+   REPLY MODE
+   ════════════════════════════════════════ *)
+
+(Handle Reply Key: KeyDispatched Handler) where <event: mode> == "reply" {
+    Extract the <pressed-key> from the <event: key>.
+
+    Retrieve the <cfg>         from the <config-repository> where <key> is "cfg".
+    Extract the <instance-url> from the <cfg: instance_url>.
+    Extract the <auth-header>  from the <cfg: auth_header>.
+
+    Retrieve the <state> from the <ui-state-repository> where <key> is "main".
+
+    match <pressed-key> {
+        case "escape" {
+            Update the <state: mode>        with "timeline".
+            Update the <state: composeText>  with "".
+            Update the <state: replyToId>   with "".
+            Update the <state: replyToAcct> with "".
+            Store the <state> into the <ui-state-repository>.
+        }
+        case "enter" {
+            Compute the <statuses-url> from <instance-url> ++ "/api/v1/statuses".
+            Request the <post-result> to <statuses-url> with {
+                headers: { Authorization: <auth-header> },
+                body: { status: <state: composeText>, in_reply_to_id: <state: replyToId>, visibility: "public" }
+            }.
+            Update the <state: mode>        with "timeline".
+            Update the <state: composeText>  with "".
+            Update the <state: replyToId>   with "".
+            Update the <state: replyToAcct> with "".
+            Store the <state> into the <ui-state-repository>.
+        }
+        case "backspace" {
+            Compute the <txt-len: length> from (<state: composeText>).
+            Compute the <has-chars>        from <txt-len> > 0.
+            match <has-chars> {
+                case true {
+                    Compute the <new-len>       from <txt-len> - 1.
+                    Compute the <trimmed: clip> from (<state: composeText>) with <new-len>.
+                    Update the <state: composeText> with <trimmed>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+                case false { }
+            }
+        }
+    }
+
+    (* Append printable character *)
+    Create the <control-keys> with ["escape", "enter", "backspace", "up", "down", "left", "right", "tab"].
+    Compute the <control-key> from <control-keys> contains <pressed-key>.
+    match <control-key> {
+        case false {
+            Compute the <char-len: length> from (<state: composeText>).
+            Compute the <under-limit>       from <char-len> < 500.
+            match <under-limit> {
+                case true {
+                    Compute the <new-text> from (<state: composeText>) ++ <pressed-key>.
+                    Update the <state: composeText> with <new-text>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+                case false { }
+            }
+        }
+        case true { }
+    }
+
+    Return an <OK: status> for the <key-handled>.
+}
+
+(* ════════════════════════════════════════
+   SETUP MODE
+   ════════════════════════════════════════ *)
+
+(Handle Setup Key: KeyDispatched Handler) where <event: mode> == "setup" {
+    Extract the <pressed-key> from the <event: key>.
+    Retrieve the <state>      from the <ui-state-repository> where <key> is "main".
+
+    match <pressed-key> {
+        case "escape" {
+            Stop the <keyboard> with <application>.
+        }
+        case "enter" {
+            Compute the <step-chk> from (<state: setupStep>) == "instance".
+            match <step-chk> {
+                case true {
+                    Create the <setup-data> with { key: "setup", instanceUrl: <state: composeText> }.
+                    Store the <setup-data> into the <config-repository>.
+                    Update the <state: setupStep>   with "token".
+                    Update the <state: composeText> with "".
+                    Store the <state> into the <ui-state-repository>.
+                }
+                case false {
+                    Retrieve the <setup-data>  from the <config-repository> where <key> is "setup".
+                    Extract the <raw-url>      from the <setup-data: instanceUrl>.
+                    Create the <access-token>  with <state: composeText>.
+                    (* Strip trailing slash so https://host/ doesn't produce //api/v1/... *)
+                    Split the <url-parts>   from <raw-url> by /\/$/.
+                    Join the <instance-url> from <url-parts> with "".
+
+                    Create the <config-path> with "~/.fediterm.json".
+                    Create the <config-data> with { instance_url: <instance-url>, access_token: <access-token> }.
+                    Write the <config-data> to the <file: config-path>.
+
+                    Compute the <auth-header> from "Bearer " ++ <access-token>.
+                    Create the <cfg> with { key: "cfg", instance_url: <instance-url>, access_token: <access-token>, auth_header: <auth-header> }.
+                    Store the <cfg> into the <config-repository>.
+
+                    Update the <state: mode>        with "timeline".
+                    Update the <state: setupStep>   with "".
+                    Update the <state: composeText> with "".
+                    Store the <state> into the <ui-state-repository>.
+
+                    Compute the <stream-url> from <instance-url> ++ "/api/v1/streaming/user".
+                    Stream the <mastodon-event> from <stream-url> with { headers: { Authorization: <auth-header> } }.
+                    Emit a <StartTimeline: event> with "start".
+                }
+            }
+        }
+        case "backspace" {
+            Compute the <txt-len: length> from (<state: composeText>).
+            Compute the <has-chars>        from <txt-len> > 0.
+            match <has-chars> {
+                case true {
+                    Compute the <new-len>       from <txt-len> - 1.
+                    Compute the <trimmed: clip> from (<state: composeText>) with <new-len>.
+                    Update the <state: composeText> with <trimmed>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+                case false { }
+            }
+        }
+    }
+
+    (* Append printable character *)
+    Create the <control-keys> with ["escape", "enter", "backspace", "up", "down", "left", "right", "tab"].
+    Compute the <control-key> from <control-keys> contains <pressed-key>.
+    match <control-key> {
+        case false {
+            Compute the <new-text> from (<state: composeText>) ++ <pressed-key>.
+            Update the <state: composeText> with <new-text>.
+            Store the <state> into the <ui-state-repository>.
+        }
+        case true { }
+    }
+
+    Return an <OK: status> for the <key-handled>.
+}

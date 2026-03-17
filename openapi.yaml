@@ -1,0 +1,52 @@
+openapi: 3.0.3
+info:
+  title: FediTerm
+  version: 2.0.0
+  description: Mastodon terminal client — no HTTP server, schemas only
+paths: {}
+components:
+  schemas:
+    UIState:
+      type: object
+      properties:
+        key:          { type: string }
+        mode:         { type: string, enum: [timeline, compose, setup, reply] }
+        setupStep:    { type: string }
+        selection:    { type: integer }
+        cursor:       { type: integer }
+        totalPosts:   { type: integer }
+        composeText:  { type: string }
+        latestId:     { type: string }
+        replyToId:    { type: string }
+        replyToAcct:  { type: string }
+    TerminalStyles:
+      type: object
+      properties:
+        separatorLine:    { type: string }
+        inputWidth:       { type: integer }
+        reset:            { type: string }
+        muted:            { type: string }
+        heading:          { type: string }
+        prompt:           { type: string }
+        cursor:           { type: string }
+        counter:          { type: string }
+        authorName:       { type: string }
+        username:         { type: string }
+        cursorIndicator:  { type: string }
+    Post:
+      type: object
+      properties:
+        mastodonId:   { type: string }
+        key:          { type: integer }
+        acct:         { type: string }
+        displayName:  { type: string }
+        content:      { type: string }
+        createdAt:    { type: string }
+        boosterAcct:  { type: string }
+    MastodonAccount:
+      type: object
+      properties:
+        acct:         { type: string }
+        display_name: { type: string }
+        id:           { type: string }
+        username:     { type: string }

@@ -1,0 +1,193 @@
+(* ============================================================
+   timeline.aro – Timeline fetching and live streaming
+
+   Fan-out pattern:
+     PostReceived  → Classify Post → DirectPost | Repost
+     mastodon-event → Classify Stream → StreamPost (stores + updates UIState)
+
+   HTML stripping: Split by /<[^>]*>/ then Join with ""
+   Null detection: JSON null arrives as the string "<null>"
+   ============================================================ *)
+
+(* ---- Post classification (initial load) ---------------------------------- *)
+
+(Classify Post: PostReceived Handler) {
+    Extract the <status>       from the <event: status>.
+    Extract the <post-index>   from the <event: idx>.
+
+    Extract the <account: MastodonAccount> from the <status: account>.
+    Extract the <booster-acct>             from the <account: acct>.
+
+    (* JSON null arrives as the string "<null>" — check before field access *)
+    Extract the <reblog-object>  from the <status: reblog>.
+    Compute the <reblog-absent>  from <reblog-object> == "<null>".
+    match <reblog-absent> {
+        case true  { Emit a <DirectPost: event> with { status: <status>, idx: <post-index> }. }
+        case false { Emit a <Repost: event>     with { reblog: <reblog-object>, boosterAcct: <booster-acct>, idx: <post-index> }. }
+    }
+
+    Return an <OK: status> for the <classification>.
+}
+
+(Store Direct: DirectPost Handler) {
+    Extract the <status>     from the <event: status>.
+    Extract the <post-index> from the <event: idx>.
+
+    Extract the <post-id>                  from the <status: id>.
+    Extract the <account: MastodonAccount> from the <status: account>.
+    Extract the <post-account>             from the <account: acct>.
+    Extract the <author-name>              from the <account: display_name>.
+    Extract the <html-content>             from the <status: content>.
+    Extract the <post-date>                from the <status: created_at>.
+
+    Split the <html-parts>   from <html-content> by /<[^>]*>/.
+    Join the <plain-content> from <html-parts> with "".
+
+    Create the <post-entry: Post> with { mastodonId: <post-id>, key: <post-index>, acct: <post-account>, displayName: <author-name>, content: <plain-content>, createdAt: <post-date>, boosterAcct: "" }.
+    Store the <post-entry> into the <post-repository>.
+
+    Return an <OK: status> for the <storage>.
+}
+
+(Store Repost: Repost Handler) {
+    Extract the <reblog>      from the <event: reblog>.
+    Extract the <booster>     from the <event: boosterAcct>.
+    Extract the <post-index>  from the <event: idx>.
+
+    Extract the <post-id>                      from the <reblog: id>.
+    Extract the <reblog-acct: MastodonAccount> from the <reblog: account>.
+    Extract the <post-account>                 from the <reblog-acct: acct>.
+    Extract the <author-name>                  from the <reblog-acct: display_name>.
+    Extract the <html-content>                 from the <reblog: content>.
+    Extract the <post-date>                    from the <reblog: created_at>.
+
+    Split the <html-parts>   from <html-content> by /<[^>]*>/.
+    Join the <plain-content> from <html-parts> with "".
+
+    Create the <post-entry: Post> with { mastodonId: <post-id>, key: <post-index>, acct: <post-account>, displayName: <author-name>, content: <plain-content>, createdAt: <post-date>, boosterAcct: <booster> }.
+    Store the <post-entry> into the <post-repository>.
+
+    Return an <OK: status> for the <storage>.
+}
+
+(* ---- Initial timeline load ------------------------------------------- *)
+
+(Load Timeline: StartTimeline Handler) {
+    Retrieve the <cfg>         from the <config-repository> where <key> is "cfg".
+    Extract the <instance-url> from the <cfg: instance_url>.
+    Extract the <auth-header>  from the <cfg: auth_header>.
+
+    Compute the <timeline-url> from <instance-url> ++ "/api/v1/timelines/home?limit=40".
+    Request the <timeline-response> from <timeline-url> with {
+        headers: { Authorization: <auth-header> }
+    }.
+    Extract the <http-status-code>           from the <timeline-response: status>.
+    Compute the <timeline-request-succeeded> from <http-status-code> == 200.
+
+    match <timeline-request-succeeded> {
+        case true {
+            Extract the <statuses>                  from the <timeline-response: body>.
+            Compute the <loaded-post-count: length> from <statuses>.
+
+            Delete the <previous-posts> from the <post-repository>.
+
+            for each <status> at <idx> in <statuses> {
+                Emit a <PostReceived: event> with { status: <status>, idx: <idx> }.
+            }
+
+            Extract the <newest-status: first> from the <statuses>.
+            Extract the <newest-post-id>       from the <newest-status: id>.
+
+            Retrieve the <state> from the <ui-state-repository> where <key> is "main".
+            Update the <state: latestId>   with <newest-post-id>.
+            Update the <state: totalPosts> with <loaded-post-count>.
+            Store the <state> into the <ui-state-repository>.
+        }
+        case false {
+            Log "Timeline load failed (HTTP " ++ <http-status-code> ++ "). Check your access token." to the <console>.
+        }
+    }
+
+    Return an <OK: status> for the <timeline-load>.
+}
+
+(* ---- Live stream: classify then prepend ---------------------------------- *)
+
+(Classify Stream: mastodon-event Handler) {
+    Extract the <stream-event-kind> from the <event: kind>.
+    Compute the <event-kind-update> from <stream-event-kind> == "update".
+    match <event-kind-update> {
+        case true {
+            Extract the <post-id>                  from the <event: id>.
+            Extract the <account: MastodonAccount> from the <event: account>.
+
+            Extract the <reblog-object> from the <event: reblog>.
+            Compute the <reblog-absent> from <reblog-object> == "<null>".
+            match <reblog-absent> {
+                case true {
+                    Extract the <html-content> from the <event: content>.
+                    Split the <html-parts>     from <html-content> by /<[^>]*>/.
+                    Join the <final-content>   from <html-parts> with "".
+                    Extract the <final-date>   from the <event: created_at>.
+                    Extract the <final-acct>   from the <account: acct>.
+                    Extract the <final-name>   from the <account: display_name>.
+                    Create the <final-booster> with "".
+                }
+                case false {
+                    Extract the <reblog-account: MastodonAccount> from the <reblog-object: account>.
+                    Extract the <final-acct>                      from the <reblog-account: acct>.
+                    Extract the <final-name>                      from the <reblog-account: display_name>.
+                    Extract the <final-date>                      from the <reblog-object: created_at>.
+                    Extract the <html-content>                    from the <reblog-object: content>.
+                    Split the <html-parts>                        from <html-content> by /<[^>]*>/.
+                    Join the <final-content>                      from <html-parts> with "".
+                    Extract the <final-booster>                   from the <account: acct>.
+                }
+            }
+
+            Emit a <StreamPost: event> with { id: <post-id>, acct: <final-acct>, displayName: <final-name>, content: <final-content>, createdAt: <final-date>, boosterAcct: <final-booster> }.
+        }
+        case false { }
+    }
+
+    Return an <OK: status> for the <stream-classification>.
+}
+
+(Add Stream Post: StreamPost Handler) {
+    Extract the <post-id>       from the <event: id>.
+    Extract the <post-account>  from the <event: acct>.
+    Extract the <author-name>   from the <event: displayName>.
+    Extract the <plain-content> from the <event: content>.
+    Extract the <post-date>     from the <event: createdAt>.
+    Extract the <post-booster>  from the <event: boosterAcct>.
+
+    Retrieve the <state>          from the <ui-state-repository> where <key> is "main".
+    Extract the <total-posts>     from the <state: totalPosts>.
+    Extract the <scroll-position> from the <state: selection>.
+
+    Retrieve the <existing-posts> from the <post-repository>.
+    Delete the <cleared>          from the <post-repository>.
+
+    Create the <new-post: Post> with { mastodonId: <post-id>, key: 0, acct: <post-account>, displayName: <author-name>, content: <plain-content>, createdAt: <post-date>, boosterAcct: <post-booster> }.
+    Store the <new-post> into the <post-repository>.
+
+    for each <existing-post> at <existing-index> in <existing-posts> {
+        Compute the <shifted-index> from <existing-index> + 1.
+        Update the <existing-post: key> with <shifted-index>.
+        Store the <existing-post>       into the <post-repository>.
+    }
+
+    Compute the <updated-post-total>  from <total-posts> + 1.
+    Compute the <scroll-viewing-top>  from <scroll-position> == 0.
+    match <scroll-viewing-top> {
+        case true  { Create the <updated-scroll-position> with 0. }
+        case false { Compute the <updated-scroll-position> from <scroll-position> + 1. }
+    }
+
+    Update the <state: latestId>   with <post-id>.
+    Update the <state: totalPosts> with <updated-post-total>.
+    Update the <state: selection>  with <updated-scroll-position>.
+    Store the <state> into the <ui-state-repository>.
+
+    Return an <OK: status> for the <stream-add>.
+}

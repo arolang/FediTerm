@@ -1,0 +1,10 @@
+(Application-End: Success) {
+    Log "FediTerm stopped." to the <console>.
+    Return an <OK: status> for the <shutdown>.
+}
+
+(Application-End: Error) {
+    Extract the <error> from the <shutdown: error>.
+    Log <error> to the <console>.
+    Return an <OK: status> for the <error-handling>.
+}

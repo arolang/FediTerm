@@ -1,0 +1,47 @@
+(* ============================================================
+   main.aro – FediTerm — Mastodon terminal client
+   No plugin required: uses native ARO HTTP, file, and keyboard actions.
+
+   Config file: ~/.fediterm.json
+     { "instance_url": "https://mastodon.social",
+       "access_token": "your-token" }
+
+   If config is missing the app enters setup mode and asks for both values.
+   ============================================================ *)
+
+(Application-Start: FediTerm) {
+    Clear the <screen> for the <terminal>.
+
+    Create the <config-path> with "~/.fediterm.json".
+    Exists the <has-config> for the <file: config-path>.
+
+    match <has-config> {
+        case true {
+            Read the <raw-config> from the <file: config-path>.
+            Extract the <raw-url>      from the <raw-config: instance_url>.
+            Extract the <access-token> from the <raw-config: access_token>.
+            (* Strip any trailing slash so URLs like https://host/ don't produce //api/v1/... *)
+            Split the <url-parts> from <raw-url> by /\/$/.
+            Join the <instance-url> from <url-parts> with "".
+            Compute the <auth-header> from "Bearer " ++ <access-token>.
+
+            Create the <cfg> with { key: "cfg", instance_url: <instance-url>, access_token: <access-token>, auth_header: <auth-header> }.
+            Store the <cfg> into the <config-repository>.
+
+            Create the <init-state: UIState> with { key: "main", mode: "timeline", setupStep: "", selection: 0, cursor: 0, totalPosts: 0, composeText: "", latestId: "", replyToId: "", replyToAcct: "" }.
+            Store the <init-state> into the <ui-state-repository>.
+
+            Compute the <stream-url> from <instance-url> ++ "/api/v1/streaming/user".
+            Stream the <mastodon-event> from <stream-url> with { headers: { Authorization: <auth-header> } }.
+            Emit a <StartTimeline: event> with "start".
+        }
+        case false {
+            Create the <setup-state: UIState> with { key: "main", mode: "setup", setupStep: "instance", selection: 0, cursor: 0, totalPosts: 0, composeText: "", latestId: "", replyToId: "", replyToAcct: "" }.
+            Store the <setup-state> into the <ui-state-repository>.
+        }
+    }
+
+    Listen the <keyboard> to the <stdin>.
+    Keepalive the <application> for the <events>.
+    Return an <OK: status> for the <startup>.
+}

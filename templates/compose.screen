@@ -1,0 +1,6 @@
+{{ Compute the <visible-text: clip> from <compose-text> with <style: inputWidth>. }} {{ <style: heading> }}FediTerm{{ <style: reset> }}{{ <style: muted> }}  enter send · esc cancel{{ <style: reset> }}
+{{ <style: muted> }}{{ <style: separatorLine> }}{{ <style: reset> }}
+ New Post{{ <style: muted> }} — {{ <style: reset> }}{{ <style: counter> }}{{ <chars-remaining> }}{{ <style: reset> }}{{ <style: muted> }} characters remaining{{ <style: reset> }}
+{{ <style: muted> }}{{ <style: separatorLine> }}{{ <style: reset> }}
+  {{ <visible-text> }}{{ <style: cursor> }}▌{{ <style: reset> }}
+{{ <style: muted> }}{{ <style: separatorLine> }}{{ <style: reset> }}

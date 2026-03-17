@@ -1,0 +1,349 @@
+(* ============================================================
+   observer.aro – Render terminal UI on every UIState change.
+
+   Fan-out pattern:
+     ui-state-repository Observer → computes style, emits Render event with mode + style
+     Render Handler where <event: mode> == "setup"    – first-run token entry
+     Render Handler where <event: mode> == "compose"  – new post dialog
+     Render Handler where <event: mode> == "timeline" – scrollable post list
+
+   Variable naming constraints:
+   - No <is-*>  (is = keyword)
+   - No <*-at>  (at = preposition)
+   ============================================================ *)
+
+(* ---- Dispatch: compute style once, emit Render event with mode + style ---- *)
+
+(Dispatch UI Render: ui-state-repository Observer) {
+    Extract the <state: UIState> from the <event: newValue>.
+    Extract the <mode>            from the <state: mode>.
+    Compute the <sep-width>   from (<terminal: columns>).
+    Compute the <separator>   from "─" * <sep-width>.
+    Compute the <input-width> from (<terminal: columns>) - 4.
+    Create the <style: TerminalStyles> with {
+        separatorLine:   <separator>,
+        inputWidth:      <input-width>,
+        reset:           "\u{001B}[0m",
+        muted:           "\u{001B}[2m",
+        heading:         "\u{001B}[1m\u{001B}[97m",
+        prompt:          "\u{001B}[36m",
+        cursor:          "\u{001B}[32m",
+        counter:         "\u{001B}[33m",
+        authorName:      "\u{001B}[1m",
+        username:        "\u{001B}[36m",
+        cursorIndicator: "\u{001B}[32m"
+    }.
+    Emit a <Render: event>        with { mode: <mode>, style: <style> }.
+    Return an <OK: status> for the <dispatch>.
+}
+
+(* ── Setup screen ── *)
+
+(Render Setup: Render Handler) where <event: mode> == "setup" {
+    Retrieve the <state: UIState> from the <ui-state-repository> where <key> is "main".
+    Extract the <style: TerminalStyles> from the <event: style>.
+
+    Extract the <compose-text>           from the <state: composeText>.
+    Compute the <step-requests-instance> from (<state: setupStep>) == "instance".
+    match <step-requests-instance> {
+        case true  { Create the <setup-prompt> with "Enter your Mastodon instance URL (e.g. https://mastodon.social):". }
+        case false { Create the <setup-prompt> with "Enter your access token:". }
+    }
+    Transform the <display> from the <template: setup.screen>.
+    Render the <display> to the <console>.
+    Return an <OK: status> for the <render>.
+}
+
+(* ── Compose screen ── *)
+
+(Render Compose: Render Handler) where <event: mode> == "compose" {
+    Retrieve the <state: UIState> from the <ui-state-repository> where <key> is "main".
+    Extract the <style: TerminalStyles> from the <event: style>.
+
+    Extract the <compose-text>            from the <state: composeText>.
+    Compute the <character-count: length> from <compose-text>.
+    Compute the <chars-remaining>         from 500 - <character-count>.
+    Transform the <display> from the <template: compose.screen>.
+    Render the <display> to the <console>.
+    Return an <OK: status> for the <render>.
+}
+
+(* ── Reply screen ── *)
+
+(Render Reply: Render Handler) where <event: mode> == "reply" {
+    Retrieve the <state: UIState> from the <ui-state-repository> where <key> is "main".
+    Extract the <style: TerminalStyles> from the <event: style>.
+
+    (* Reduce visible slots by 5 rows to fit inline reply box *)
+    Compute the <panel-height>  from (<terminal: rows>) - 8.
+    Compute the <visible-count> from <panel-height> / 3.
+
+    Compute the <account-column-width> from (<terminal: columns>) - 22.
+    Compute the <content-column-width> from (<terminal: columns>) - 4.
+    Compute the <post-separator-width> from (<terminal: columns>) - 2.
+    Compute the <post-separator>       from "─" * <post-separator-width>.
+
+    Delete the <previous-slots>       from the <visible-slot-repository>.
+    Delete the <previous-wrap-states> from the <wrap-state-repository>.
+
+    for <slot-index> from 0 to <visible-count> {
+        Compute the <post-index> from <slot-index> + (<state: selection>).
+
+        Retrieve the <post> from the <post-repository>
+            where <key> = <post-index>
+            default { key: -1, acct: "", displayName: "", content: "", createdAt: "", boosterAcct: "" }.
+
+        Extract the <post-account>      from the <post: acct>.
+        Extract the <post-display-name> from the <post: displayName>.
+        Extract the <post-content>      from the <post: content>.
+        Extract the <post-date>         from the <post: createdAt>.
+        Extract the <post-booster>      from the <post: boosterAcct>.
+
+        Compute the <this-slot-selected> from <slot-index> == (<state: cursor>).
+        match <this-slot-selected> {
+            case true  { Create the <cursor-marker> with "▶". }
+            case false { Create the <cursor-marker> with " ". }
+        }
+
+        Compute the <account-text: clip>        from <post-account>      with <account-column-width>.
+        Compute the <author-display-text: clip>  from <post-display-name> with 18.
+        Compute the <date-display-text: clip>    from <post-date>         with 16.
+
+        Split the <content-words> from <post-content> by /\s/.
+        Create the <initial-wrap-state> with { key: <slot-index>, curLine: "", result: "" }.
+        Store the <initial-wrap-state> into the <wrap-state-repository>.
+
+        for each <word> in <content-words> {
+            Compute the <word-character-count: length> from <word>.
+            Compute the <word-has-no-text>             from <word-character-count> == 0.
+            match <word-has-no-text> {
+                case true  { }
+                case false {
+                    Retrieve the <wrap-state>     from the <wrap-state-repository> where <key> = <slot-index>.
+                    Extract the <current-line>    from the <wrap-state: curLine>.
+                    Extract the <completed-lines> from the <wrap-state: result>.
+
+                    Compute the <current-line-length: length> from <current-line>.
+                    Compute the <current-line-has-no-words>  from <current-line-length> == 0.
+                    match <current-line-has-no-words> {
+                        case true  { Create the <projected-length> with <word-character-count>. }
+                        case false { Compute the <projected-length> from <current-line-length> + <word-character-count> + 1. }
+                    }
+
+                    Compute the <word-fits-current-line> from <projected-length> <= <content-column-width>.
+                    match <word-fits-current-line> {
+                        case true {
+                            match <current-line-has-no-words> {
+                                case true  { Create the <line-extended> with <word>. }
+                                case false { Compute the <line-extended> from <current-line> ++ " " ++ <word>. }
+                            }
+                            Update the <wrap-state: curLine> with <line-extended>.
+                            Store the <wrap-state> into the <wrap-state-repository>.
+                        }
+                        case false {
+                            Compute the <no-completed-lines-yet> from <completed-lines> == "".
+                            match <no-completed-lines-yet> {
+                                case true  { Create the <completed-lines-extended> with <current-line>. }
+                                case false { Compute the <completed-lines-extended> from <completed-lines> ++ "\u{000A}  " ++ <current-line>. }
+                            }
+                            Update the <wrap-state: result>  with <completed-lines-extended>.
+                            Update the <wrap-state: curLine> with <word>.
+                            Store the <wrap-state> into the <wrap-state-repository>.
+                        }
+                    }
+                }
+            }
+        }
+
+        Retrieve the <final-wrap-state>   from the <wrap-state-repository> where <key> = <slot-index>.
+        Extract the <last-partial-line>   from the <final-wrap-state: curLine>.
+        Extract the <all-completed-lines> from the <final-wrap-state: result>.
+        Compute the <content-fits-one-line> from <all-completed-lines> == "".
+        match <content-fits-one-line> {
+            case true  { Create the <wrapped-content> with <last-partial-line>. }
+            case false { Compute the <wrapped-content> from <all-completed-lines> ++ "\u{000A}  " ++ <last-partial-line>. }
+        }
+
+        Compute the <booster-len: length> from <post-booster>.
+        Compute the <has-booster>         from <booster-len> > 0.
+        match <has-booster> {
+            case true  { Compute the <booster-label> from "\u{001B}[2m ↻ \u{001B}[0m\u{001B}[36m@" ++ <post-booster> ++ "\u{001B}[0m". }
+            case false { Create the <booster-label> with "". }
+        }
+
+        Create the <slot: Slot> with { key: <slot-index>, marker: <cursor-marker>, acct: <account-text>, name: <author-display-text>, content: <wrapped-content>, date: <date-display-text>, booster: <booster-label>, sep: <post-separator> }.
+        Store the <slot> into the <visible-slot-repository>.
+    }
+
+    (* ── Split slots into pre-cursor and post-cursor for inline reply prompt ── *)
+    Extract the <cursor-pos>  from the <state: cursor>.
+    Compute the <post-start>  from <cursor-pos> + 1.
+
+    Delete the <prev-pre-slots>  from the <pre-slot-repository>.
+    Delete the <prev-post-slots> from the <post-slot-repository>.
+
+    for <pre-idx> from 0 to <post-start> {
+        Retrieve the <pre-slot> from the <visible-slot-repository> where <key> = <pre-idx>.
+        Store the <pre-slot> into the <pre-slot-repository>.
+    }
+
+    Compute the <post-slots-exist> from <post-start> <= <visible-count>.
+    match <post-slots-exist> {
+        case true {
+            for <post-idx> from <post-start> to <visible-count> {
+                Retrieve the <post-slot> from the <visible-slot-repository> where <key> = <post-idx>.
+                Store the <post-slot> into the <post-slot-repository>.
+            }
+        }
+        case false { }
+    }
+
+    Retrieve the <pre-display-slots>  from the <pre-slot-repository>.
+    Retrieve the <post-display-slots> from the <post-slot-repository>.
+
+    Extract the <selection>   from the <state: selection>.
+    Extract the <total-posts> from the <state: totalPosts>.
+
+    Compute the <scroll-position-zero> from <selection> == 0.
+    Compute the <cursor-position-zero> from (<state: cursor>) == 0.
+    Compute the <viewing-post-top>     from <scroll-position-zero> AND <cursor-position-zero>.
+    match <viewing-post-top> {
+        case true  { Create the <auto-label> with "\u{001B}[34m (autoupdate)\u{001B}[0m". }
+        case false { Create the <auto-label> with "". }
+    }
+
+    Extract the <compose-text>            from the <state: composeText>.
+    Extract the <reply-acct>              from the <state: replyToAcct>.
+    Compute the <character-count: length> from <compose-text>.
+
+    Transform the <display> from the <template: reply.screen>.
+    Render the <display> to the <console>.
+    Return an <OK: status> for the <render>.
+}
+
+(* ── Timeline screen ── *)
+
+(Render Timeline: Render Handler) where <event: mode> == "timeline" {
+    Retrieve the <state: UIState> from the <ui-state-repository> where <key> is "main".
+    Extract the <style: TerminalStyles> from the <event: style>.
+
+    Compute the <panel-height>  from (<terminal: rows>) - 3.
+    Compute the <visible-count> from <panel-height> / 3.
+
+    Compute the <account-column-width> from (<terminal: columns>) - 22.
+    Compute the <content-column-width> from (<terminal: columns>) - 4.
+    Compute the <post-separator-width> from (<terminal: columns>) - 2.
+    Compute the <post-separator>       from "─" * <post-separator-width>.
+
+    Delete the <previous-slots>       from the <visible-slot-repository>.
+    Delete the <previous-wrap-states> from the <wrap-state-repository>.
+
+    for <slot-index> from 0 to <visible-count> {
+        Compute the <post-index> from <slot-index> + (<state: selection>).
+
+        Retrieve the <post> from the <post-repository>
+            where <key> = <post-index>
+            default { key: -1, acct: "", displayName: "", content: "", createdAt: "", boosterAcct: "" }.
+
+        Extract the <post-account>      from the <post: acct>.
+        Extract the <post-display-name> from the <post: displayName>.
+        Extract the <post-content>      from the <post: content>.
+        Extract the <post-date>         from the <post: createdAt>.
+        Extract the <post-booster>      from the <post: boosterAcct>.
+
+        Compute the <this-slot-selected> from <slot-index> == (<state: cursor>).
+        match <this-slot-selected> {
+            case true  { Create the <cursor-marker> with "▶". }
+            case false { Create the <cursor-marker> with " ". }
+        }
+
+        Compute the <account-text: clip>        from <post-account>      with <account-column-width>.
+        Compute the <author-display-text: clip>  from <post-display-name> with 18.
+        Compute the <date-display-text: clip>    from <post-date>         with 16.
+
+        (* ── Word-wrap post content into lines of content-column-width ── *)
+        Split the <content-words> from <post-content> by /\s/.
+        Create the <initial-wrap-state> with { key: <slot-index>, curLine: "", result: "" }.
+        Store the <initial-wrap-state> into the <wrap-state-repository>.
+
+        for each <word> in <content-words> {
+            Compute the <word-character-count: length> from <word>.
+            Compute the <word-has-no-text>             from <word-character-count> == 0.
+            match <word-has-no-text> {
+                case true  { }
+                case false {
+                    Retrieve the <wrap-state>     from the <wrap-state-repository> where <key> = <slot-index>.
+                    Extract the <current-line>    from the <wrap-state: curLine>.
+                    Extract the <completed-lines> from the <wrap-state: result>.
+
+                    Compute the <current-line-length: length> from <current-line>.
+                    Compute the <current-line-has-no-words>  from <current-line-length> == 0.
+                    match <current-line-has-no-words> {
+                        case true  { Create the <projected-length> with <word-character-count>. }
+                        case false { Compute the <projected-length> from <current-line-length> + <word-character-count> + 1. }
+                    }
+
+                    Compute the <word-fits-current-line> from <projected-length> <= <content-column-width>.
+                    match <word-fits-current-line> {
+                        case true {
+                            match <current-line-has-no-words> {
+                                case true  { Create the <line-extended> with <word>. }
+                                case false { Compute the <line-extended> from <current-line> ++ " " ++ <word>. }
+                            }
+                            Update the <wrap-state: curLine> with <line-extended>.
+                            Store the <wrap-state> into the <wrap-state-repository>.
+                        }
+                        case false {
+                            Compute the <no-completed-lines-yet> from <completed-lines> == "".
+                            match <no-completed-lines-yet> {
+                                case true  { Create the <completed-lines-extended> with <current-line>. }
+                                case false { Compute the <completed-lines-extended> from <completed-lines> ++ "\u{000A}  " ++ <current-line>. }
+                            }
+                            Update the <wrap-state: result>  with <completed-lines-extended>.
+                            Update the <wrap-state: curLine> with <word>.
+                            Store the <wrap-state> into the <wrap-state-repository>.
+                        }
+                    }
+                }
+            }
+        }
+
+        Retrieve the <final-wrap-state>   from the <wrap-state-repository> where <key> = <slot-index>.
+        Extract the <last-partial-line>   from the <final-wrap-state: curLine>.
+        Extract the <all-completed-lines> from the <final-wrap-state: result>.
+        Compute the <content-fits-one-line> from <all-completed-lines> == "".
+        match <content-fits-one-line> {
+            case true  { Create the <wrapped-content> with <last-partial-line>. }
+            case false { Compute the <wrapped-content> from <all-completed-lines> ++ "\u{000A}  " ++ <last-partial-line>. }
+        }
+        (* ── End word-wrap ── *)
+
+        (* ── Repost indicator ── *)
+        Compute the <booster-len: length> from <post-booster>.
+        Compute the <has-booster>         from <booster-len> > 0.
+        match <has-booster> {
+            case true  { Compute the <booster-label> from "\u{001B}[2m ↻ \u{001B}[0m\u{001B}[36m@" ++ <post-booster> ++ "\u{001B}[0m". }
+            case false { Create the <booster-label> with "". }
+        }
+
+        Create the <slot: Slot> with { key: <slot-index>, marker: <cursor-marker>, acct: <account-text>, name: <author-display-text>, content: <wrapped-content>, date: <date-display-text>, booster: <booster-label>, sep: <post-separator> }.
+        Store the <slot> into the <visible-slot-repository>.
+    }
+
+    Retrieve the <display-slots> from the <visible-slot-repository>.
+
+    Extract the <selection>   from the <state: selection>.
+    Extract the <total-posts> from the <state: totalPosts>.
+
+    Compute the <scroll-position-zero> from <selection> == 0.
+    Compute the <cursor-position-zero> from (<state: cursor>) == 0.
+    Compute the <viewing-post-top>     from <scroll-position-zero> AND <cursor-position-zero>.
+    match <viewing-post-top> {
+        case true  { Create the <auto-label> with "\u{001B}[34m (autoupdate)\u{001B}[0m". }
+        case false { Create the <auto-label> with "". }
+    }
+
+    Transform the <display> from the <template: timeline.screen>.
+    Render the <display> to the <console>.
+    Return an <OK: status> for the <render>.
+}
