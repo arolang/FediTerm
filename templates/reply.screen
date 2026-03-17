@@ -1,6 +1,6 @@
 {{ Compute the <visible-text: clip> from <compose-text> with <style: inputWidth>. }} {{ <style: heading> }}FediTerm{{ <style: reset> }}{{ <style: muted> }}  enter send · esc cancel{{ <style: reset> }}
 {{ <style: muted> }}{{ <style: separatorLine> }}{{ <style: reset> }}
-{{ for each <slot> in <pre-display-slots> { }}{{ <style: cursorIndicator> }}{{ <slot: marker> }}{{ <style: reset> }} {{ <style: username> }}@{{ <slot: acct> }}{{ <style: reset> }}  {{ <style: authorName> }}{{ <slot: name> }}{{ <style: reset> }}  {{ <style: muted> }}{{ <slot: date> }}{{ <style: reset> }}{{ <slot: booster> }}
+{{ for each <slot> in <pre-display-slots> { }}{{ <style: cursorIndicator> }}{{ <slot: marker> }}{{ <style: reset> }} {{ <style: username> }}@{{ <slot: acct> }}{{ <style: reset> }}  {{ <style: authorName> }}{{ <slot: name> }}{{ <style: reset> }}  {{ <style: muted> }}{{ <slot: date> }}{{ <style: reset> }}{{ <slot: booster> }}{{ <slot: boostMarker> }}{{ <slot: favMarker> }}
   {{ <slot: content> }}
 {{ <style: muted> }}  {{ <slot: sep> }}{{ <style: reset> }}
 {{ } }}{{ <style: prompt> }}{{ <style: separatorLine> }}{{ <style: reset> }}
@@ -8,7 +8,7 @@
   {{ <visible-text> }}{{ <style: cursor> }}▌{{ <style: reset> }}
 {{ Compute the <counter-text> from <character-count> ++ "/500". Compute the <counter-len: length> from <counter-text>. Compute the <pad-width> from (<terminal: columns>) - <counter-len> - 1. Compute the <counter-pad> from " " * <pad-width>. }}{{ <counter-pad> }}{{ <style: counter> }}{{ <counter-text> }}{{ <style: reset> }}
 {{ <style: muted> }}{{ <style: separatorLine> }}{{ <style: reset> }}
-{{ for each <slot> in <post-display-slots> { }}{{ <style: cursorIndicator> }}{{ <slot: marker> }}{{ <style: reset> }} {{ <style: username> }}@{{ <slot: acct> }}{{ <style: reset> }}  {{ <style: authorName> }}{{ <slot: name> }}{{ <style: reset> }}  {{ <style: muted> }}{{ <slot: date> }}{{ <style: reset> }}{{ <slot: booster> }}
+{{ for each <slot> in <post-display-slots> { }}{{ <style: cursorIndicator> }}{{ <slot: marker> }}{{ <style: reset> }} {{ <style: username> }}@{{ <slot: acct> }}{{ <style: reset> }}  {{ <style: authorName> }}{{ <slot: name> }}{{ <style: reset> }}  {{ <style: muted> }}{{ <slot: date> }}{{ <style: reset> }}{{ <slot: booster> }}{{ <slot: boostMarker> }}{{ <slot: favMarker> }}
   {{ <slot: content> }}
 {{ <style: muted> }}  {{ <slot: sep> }}{{ <style: reset> }}
 {{ } }}{{ <style: muted> }} {{ <total-posts> }} posts · pos {{ <selection> }}{{ <auto-label> }}{{ <style: reset> }}

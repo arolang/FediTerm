@@ -171,7 +171,21 @@
             case false { Create the <booster-label> with "". }
         }
 
-        Create the <slot: Slot> with { key: <slot-index>, marker: <cursor-marker>, acct: <account-text>, name: <author-display-text>, content: <wrapped-content>, date: <date-display-text>, booster: <booster-label>, sep: <post-separator> }.
+        Extract the <post-boosted>  from the <post: boosted>.
+        Compute the <was-boosted>   from <post-boosted> == "true".
+        match <was-boosted> {
+            case true  { Create the <boost-marker> with " 🚀". }
+            case false { Create the <boost-marker> with "". }
+        }
+
+        Extract the <post-favourited> from the <post: favourited>.
+        Compute the <was-favourited>  from <post-favourited> == "true".
+        match <was-favourited> {
+            case true  { Create the <fav-marker> with " ❤️". }
+            case false { Create the <fav-marker> with "". }
+        }
+
+        Create the <slot: Slot> with { key: <slot-index>, marker: <cursor-marker>, acct: <account-text>, name: <author-display-text>, content: <wrapped-content>, date: <date-display-text>, booster: <booster-label>, boostMarker: <boost-marker>, favMarker: <fav-marker>, sep: <post-separator> }.
         Store the <slot> into the <visible-slot-repository>.
     }
 
@@ -326,7 +340,21 @@
             case false { Create the <booster-label> with "". }
         }
 
-        Create the <slot: Slot> with { key: <slot-index>, marker: <cursor-marker>, acct: <account-text>, name: <author-display-text>, content: <wrapped-content>, date: <date-display-text>, booster: <booster-label>, sep: <post-separator> }.
+        Extract the <post-boosted>  from the <post: boosted>.
+        Compute the <was-boosted>   from <post-boosted> == "true".
+        match <was-boosted> {
+            case true  { Create the <boost-marker> with " 🚀". }
+            case false { Create the <boost-marker> with "". }
+        }
+
+        Extract the <post-favourited> from the <post: favourited>.
+        Compute the <was-favourited>  from <post-favourited> == "true".
+        match <was-favourited> {
+            case true  { Create the <fav-marker> with " ❤️". }
+            case false { Create the <fav-marker> with "". }
+        }
+
+        Create the <slot: Slot> with { key: <slot-index>, marker: <cursor-marker>, acct: <account-text>, name: <author-display-text>, content: <wrapped-content>, date: <date-display-text>, booster: <booster-label>, boostMarker: <boost-marker>, favMarker: <fav-marker>, sep: <post-separator> }.
         Store the <slot> into the <visible-slot-repository>.
     }
 

@@ -92,6 +92,52 @@
             Update the <state: composeText>  with "".
             Store the <state> into the <ui-state-repository>.
         }
+        case "b" {
+            Compute the <selected-index> from (<state: selection>) + (<state: cursor>).
+            Retrieve the <selected-post> from the <post-repository>
+                where <key> = <selected-index>
+                default { key: -1, mastodonId: "", acct: "", displayName: "", content: "", createdAt: "", boosterAcct: "", boosted: "" }.
+            Extract the <boost-target-id> from the <selected-post: mastodonId>.
+            Compute the <no-post> from <boost-target-id> == "".
+            match <no-post> {
+                case true  { }
+                case false {
+                    Retrieve the <cfg>         from the <config-repository> where <key> is "cfg".
+                    Extract the <instance-url> from the <cfg: instance_url>.
+                    Extract the <auth-header>  from the <cfg: auth_header>.
+                    Compute the <reblog-url> from <instance-url> ++ "/api/v1/statuses/" ++ <boost-target-id> ++ "/reblog".
+                    Request the <boost-result> to <reblog-url> with {
+                        headers: { Authorization: <auth-header> }
+                    }.
+                    Update the <selected-post: boosted> with "true".
+                    Store the <selected-post> into the <post-repository>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+            }
+        }
+        case "3" {
+            Compute the <selected-index> from (<state: selection>) + (<state: cursor>).
+            Retrieve the <selected-post> from the <post-repository>
+                where <key> = <selected-index>
+                default { key: -1, mastodonId: "", acct: "", displayName: "", content: "", createdAt: "", boosterAcct: "", boosted: "", favourited: "" }.
+            Extract the <fav-target-id> from the <selected-post: mastodonId>.
+            Compute the <no-post> from <fav-target-id> == "".
+            match <no-post> {
+                case true  { }
+                case false {
+                    Retrieve the <cfg>         from the <config-repository> where <key> is "cfg".
+                    Extract the <instance-url> from the <cfg: instance_url>.
+                    Extract the <auth-header>  from the <cfg: auth_header>.
+                    Compute the <favourite-url> from <instance-url> ++ "/api/v1/statuses/" ++ <fav-target-id> ++ "/favourite".
+                    Request the <fav-result> to <favourite-url> with {
+                        headers: { Authorization: <auth-header> }
+                    }.
+                    Update the <selected-post: favourited> with "true".
+                    Store the <selected-post> into the <post-repository>.
+                    Store the <state> into the <ui-state-repository>.
+                }
+            }
+        }
         case "r" {
             Compute the <selected-index> from (<state: selection>) + (<state: cursor>).
             Retrieve the <selected-post> from the <post-repository>

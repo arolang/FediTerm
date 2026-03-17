@@ -43,6 +43,8 @@ components:
         content:      { type: string }
         createdAt:    { type: string }
         boosterAcct:  { type: string }
+        boosted:      { type: string }
+        favourited:   { type: string }
     MastodonAccount:
       type: object
       properties:

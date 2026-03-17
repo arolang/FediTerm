@@ -43,7 +43,7 @@
     Split the <html-parts>   from <html-content> by /<[^>]*>/.
     Join the <plain-content> from <html-parts> with "".
 
-    Create the <post-entry: Post> with { mastodonId: <post-id>, key: <post-index>, acct: <post-account>, displayName: <author-name>, content: <plain-content>, createdAt: <post-date>, boosterAcct: "" }.
+    Create the <post-entry: Post> with { mastodonId: <post-id>, key: <post-index>, acct: <post-account>, displayName: <author-name>, content: <plain-content>, createdAt: <post-date>, boosterAcct: "", boosted: "", favourited: "" }.
     Store the <post-entry> into the <post-repository>.
 
     Return an <OK: status> for the <storage>.
@@ -64,7 +64,7 @@
     Split the <html-parts>   from <html-content> by /<[^>]*>/.
     Join the <plain-content> from <html-parts> with "".
 
-    Create the <post-entry: Post> with { mastodonId: <post-id>, key: <post-index>, acct: <post-account>, displayName: <author-name>, content: <plain-content>, createdAt: <post-date>, boosterAcct: <booster> }.
+    Create the <post-entry: Post> with { mastodonId: <post-id>, key: <post-index>, acct: <post-account>, displayName: <author-name>, content: <plain-content>, createdAt: <post-date>, boosterAcct: <booster>, boosted: "", favourited: "" }.
     Store the <post-entry> into the <post-repository>.
 
     Return an <OK: status> for the <storage>.
@@ -168,7 +168,7 @@
     Retrieve the <existing-posts> from the <post-repository>.
     Delete the <cleared>          from the <post-repository>.
 
-    Create the <new-post: Post> with { mastodonId: <post-id>, key: 0, acct: <post-account>, displayName: <author-name>, content: <plain-content>, createdAt: <post-date>, boosterAcct: <post-booster> }.
+    Create the <new-post: Post> with { mastodonId: <post-id>, key: 0, acct: <post-account>, displayName: <author-name>, content: <plain-content>, createdAt: <post-date>, boosterAcct: <post-booster>, boosted: "", favourited: "" }.
     Store the <new-post> into the <post-repository>.
 
     for each <existing-post> at <existing-index> in <existing-posts> {
