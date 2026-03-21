@@ -78,7 +78,7 @@
     Compute the <panel-height>  from (<terminal: rows>) - 8.
     Compute the <visible-count> from <panel-height> / 3.
 
-    Compute the <account-column-width> from (<terminal: columns>) - 22.
+    Compute the <account-column-width> from (<terminal: columns>) - 42.
     Compute the <content-column-width> from (<terminal: columns>) - 4.
     Compute the <post-separator-width> from (<terminal: columns>) - 2.
     Compute the <post-separator>       from "─" * <post-separator-width>.
@@ -91,7 +91,7 @@
 
         Retrieve the <post> from the <post-repository>
             where <key> = <post-index>
-            default { key: -1, acct: "", displayName: "", content: "", createdAt: "", boosterAcct: "" }.
+            default { key: -1, acct: "", displayName: "", content: "", createdAt: "", boosterAcct: "", boosted: "", favourited: "" }.
 
         Extract the <post-account>      from the <post: acct>.
         Extract the <post-display-name> from the <post: displayName>.
@@ -244,7 +244,7 @@
     Compute the <panel-height>  from (<terminal: rows>) - 3.
     Compute the <visible-count> from <panel-height> / 3.
 
-    Compute the <account-column-width> from (<terminal: columns>) - 22.
+    Compute the <account-column-width> from (<terminal: columns>) - 42.
     Compute the <content-column-width> from (<terminal: columns>) - 4.
     Compute the <post-separator-width> from (<terminal: columns>) - 2.
     Compute the <post-separator>       from "─" * <post-separator-width>.
@@ -257,7 +257,7 @@
 
         Retrieve the <post> from the <post-repository>
             where <key> = <post-index>
-            default { key: -1, acct: "", displayName: "", content: "", createdAt: "", boosterAcct: "" }.
+            default { key: -1, acct: "", displayName: "", content: "", createdAt: "", boosterAcct: "", boosted: "", favourited: "" }.
 
         Extract the <post-account>      from the <post: acct>.
         Extract the <post-display-name> from the <post: displayName>.
