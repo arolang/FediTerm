@@ -19,17 +19,7 @@ Browse your home timeline, watch new posts arrive in real time, compose and send
 
 ## Screenshot
 
-```
- FediTerm  ↑↓ navigate · n compose · r reply · esc quit
-──────────────────────────────────────────────────────────
-▶ @alice@mastodon.social  Alice Wonderland  2025-03-17
-  Just pushed a new release — feedback welcome!
-  ──────────────────────────────────────────────
-  @bob@fosstodon.org      Bob Builder       2025-03-17
-  Building something cool with ARO today.
-  ──────────────────────────────────────────────
- 42 posts · pos 0 (autoupdate)
-```
+![FediTerm screenshot](Assets/screenshot.jpeg)
 
 ---
 
